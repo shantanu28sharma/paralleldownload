@@ -40,11 +40,11 @@ impl Downloader {
         loop{
             let url = self.take_handle.recv().await.unwrap();
             let task = async move { Self::ind_down(url).await };
-            task.await.unwrap();
+            tokio::spawn(task);
         }
     }
 
-    async fn ind_down(url: String) -> Result<(), Box<dyn Error>> {
+    async fn ind_down(url: String) -> Result<(), reqwest::Error> {
         let mut res = reqwest::get(&url).await?;
         while let Some(chunk) = res.chunk().await? {
             println!("Chunk: {:?}", String::from_utf8_lossy(&chunk));
