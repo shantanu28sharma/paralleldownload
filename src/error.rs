@@ -2,10 +2,10 @@ use reqwest;
 use std::fmt;
 use std::io;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum DownloadError {
-    HttpError(reqwest::Error),
-    WriteError(io::Error),
+    HttpError(String),
+    WriteError(String),
     EnqueError(String),
 }
 
@@ -23,12 +23,12 @@ impl fmt::Display for DownloadError {
 
 impl From<reqwest::Error> for DownloadError {
     fn from(err: reqwest::Error) -> Self {
-        DownloadError::HttpError(err)
+        DownloadError::HttpError(format!("HTTP Error {:?}", err))
     }
 }
 
 impl From<io::Error> for DownloadError {
     fn from(err: io::Error) -> Self {
-        DownloadError::WriteError(err)
+        DownloadError::WriteError(format!("I/O Error {:?}", err))
     }
 }
