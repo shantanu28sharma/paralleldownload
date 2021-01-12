@@ -91,17 +91,23 @@ impl Downloader {
     }
 
     fn ind_writer(write: Write) -> io::Result<()> {
-        let mut f = OpenOptions::new()
+        match OpenOptions::new()
             .write(true)
             .create(true)
-            .open(write.file)?;
-        match f.seek(SeekFrom::Start(write.offset)){
-            Err(e)=>println!("{}", e),
-            Ok(_)=>{}
-        }
-        match f.write(&write.data){
-            Err(e)=>println!("{}", e),
-            Ok(_)=>{}
+            .open(write.file){
+                Ok(mut f) => {
+                    match f.seek(SeekFrom::Start(write.offset)){
+                        Err(e)=>println!("{}", e),
+                        Ok(_)=>{}
+                    }
+                    match f.write(&write.data){
+                        Err(e)=>println!("{}", e),
+                        Ok(_)=>{}
+                    }
+                },
+                Err(e) => {
+                    println!("{}", e);
+                }
         }
         Ok(())
     }
