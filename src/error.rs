@@ -9,26 +9,24 @@ pub enum DownloadError {
     EnqueError(String),
 }
 
-impl std::error::Error for DownloadError {}
-
 impl fmt::Display for DownloadError {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
-            DownloadError::HttpError(e) => write!(f, "{:#?}", e),
-            DownloadError::WriteError(e) => write!(f, "{:#?}", e),
-            DownloadError::EnqueError(e) => write!(f, "{}", e),
+            DownloadError::HttpError(e) => write!(f, "{:#?}\n", e),
+            DownloadError::WriteError(e) => write!(f, "{:#?}\n", e),
+            DownloadError::EnqueError(e) => write!(f, "{}\n", e),
         }
     }
 }
 
 impl From<reqwest::Error> for DownloadError {
     fn from(err: reqwest::Error) -> Self {
-        DownloadError::HttpError(format!("HTTP Error {:?}", err))
+        DownloadError::HttpError(format!("HTTP Error {:#?}", err))
     }
 }
 
 impl From<io::Error> for DownloadError {
     fn from(err: io::Error) -> Self {
-        DownloadError::WriteError(format!("I/O Error {:?}", err))
+        DownloadError::WriteError(format!("I/O Error {:#?}", err))
     }
 }

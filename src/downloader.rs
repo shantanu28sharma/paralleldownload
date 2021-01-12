@@ -12,19 +12,20 @@ pub struct Write {
     data: Vec<u8>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FileInfo {
     url: String,
     path: String,
+    create: bool
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ErrorInfo {
     file: FileInfo,
     error: DownloadError,
 }
 
-pub struct DownloadInfo {
+pub struct Results {
     success: RwLock<Vec<FileInfo>>,
     errors: RwLock<Vec<ErrorInfo>>,
 }
@@ -33,28 +34,10 @@ pub struct Downloader {
     count: usize,
     max_conn: usize,
     push_handle: mpsc::UnboundedSender<FileInfo>,
-    pub download_info: Arc<DownloadInfo>,
+    download_info: Arc<Results>,
 }
 
-impl Clone for FileInfo {
-    fn clone(&self) -> FileInfo {
-        FileInfo {
-            url: self.url.clone(),
-            path: self.path.clone(),
-        }
-    }
-}
-
-impl Clone for ErrorInfo {
-    fn clone(&self) -> Self {
-        ErrorInfo {
-            file: self.file.clone(),
-            error: DownloadError::EnqueError("This did not complete".to_string())
-        }
-    }
-}
-
-impl DownloadInfo {
+impl Results {
     fn new() -> Self {
         Self {
             success: RwLock::new(vec![]),
@@ -86,7 +69,7 @@ impl DownloadInfo {
 impl Downloader {
     pub fn new(max_conn: Option<usize>) -> Self {
         let (sx, rx) = mpsc::unbounded_channel();
-        let d_info = Arc::new(DownloadInfo::new());
+        let d_info = Arc::new(Results::new());
         tokio::spawn(Self::start_download(rx, d_info.clone()));
         Downloader {
             count: 0,
@@ -96,7 +79,7 @@ impl Downloader {
         }
     }
 
-    pub fn enque_file(&mut self, url: String, path: String) -> Result<(), DownloadError> {
+    pub fn enque_file(&mut self, url: String, path: String, create: bool) -> Result<(), DownloadError> {
         if self.count == self.max_conn {
             eprintln!("limit reached");
             return Err(DownloadError::EnqueError("Limit Reached".to_string()));
@@ -105,8 +88,9 @@ impl Downloader {
         let sx = self.push_handle.clone();
         tokio::spawn(async move {
             match sx.send(FileInfo {
-                url: url,
-                path: path,
+                url,
+                path,
+                create
             }) {
                 Ok(_) => Ok(()),
                 Err(_) => {
@@ -128,12 +112,12 @@ impl Downloader {
 
     pub async fn start_download(
         mut reciever: mpsc::UnboundedReceiver<FileInfo>,
-        d_info: Arc<DownloadInfo>,
+        d_info: Arc<Results>,
     ) -> Result<(), DownloadError> {
         let (wsx, wrx) = mpsc::unbounded_channel();
         tokio::spawn(Self::writer(wrx, d_info.clone()));
         loop {
-            let file = reciever.recv().await.expect("Cannot recieve from queue");
+            let file = reciever.recv().await.expect("Sender end destroyed, maybe t went out of scope");
             let write_push_handle = wsx.clone();
             let d_info = d_info.clone();
             let task = async move {
@@ -173,7 +157,7 @@ impl Downloader {
 
     pub async fn writer(
         mut reciever: mpsc::UnboundedReceiver<Write>,
-        d_info: Arc<DownloadInfo>,
+        d_info: Arc<Results>,
     ) -> Result<(), DownloadError> {
         loop {
             let write = reciever.recv().await;
@@ -190,7 +174,7 @@ impl Downloader {
     fn ind_writer(write: Write) -> Result<(), DownloadError> {
         let mut f = OpenOptions::new()
             .write(true)
-            .create(true)
+            .create(write.file.create)
             .open(write.file.path)?;
         f.seek(SeekFrom::Start(write.offset))?;
         f.write(&write.data)?;
